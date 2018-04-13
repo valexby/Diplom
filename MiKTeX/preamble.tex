@@ -6,11 +6,11 @@
 % Зачем: Настройка Times New Roman.
 % Рекомендовано для Windows (нужен PSCyr, подробности см. в fonts_windows.tex)
 % раскомментировать, чтобы использовать:
-\input{fonts_windows}
+% \input{fonts_windows}
 
 % Рекомендовано для Linux (нужен scalable-cyrfonts-tex, подробности см. в fonts_linux.tex)
 % раскомментировать, чтобы использовать:
-% \input{fonts_linux}% не забудьте закомментировать \input{fonts_windows}
+\input{fonts_linux}% не забудьте закомментировать \input{fonts_windows}
 
 % Зачем: Установка кодировки исходных файлов.
 \usepackage[utf8]{inputenc}
@@ -32,7 +32,7 @@
 % Зачем: Длинна, пимерно соответвующая 5 символам
 % Почему: Требования содержат странное требование про отсупы в 5 символов (для немоноширинного шрифта :| )
 \newlength{\fivecharsapprox}
-\setlength{\fivecharsapprox}{6ex}
+\setlength{\fivecharsapprox}{1.5cm}
 
 
 % Зачем: Добавляет отступы для абзацев.
@@ -296,7 +296,7 @@
 % Зачем: Устанавливает отступ от границы документа до символа списка, чтобы этот отступ равнялся отступу параграфа
 % Почему: Пункт 2.3.5 Требований по оформлению пояснительной записки.
 
-\setlist[itemize,0]{itemindent=\parindent + 2.2ex,leftmargin=0ex}
+\setlist[itemize,0]{itemindent=\parindent + 2.2ex,leftmargin=0ex,label=--}
 \setlist[enumerate,1]{itemindent=\parindent + 2.7ex,leftmargin=0ex}
 \setlist[enumerate,2]{itemindent=\parindent + \parindent - 2.7ex}
 
