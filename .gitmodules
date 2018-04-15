@@ -1,0 +1,3 @@
+[submodule "MiKTeX/vmsis-latex-preamble"]
+	path = MiKTeX/vmsis-latex-preamble
+	url = git@github.com:valexby/vmsis-latex-preamble.git
