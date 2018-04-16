@@ -16,7 +16,7 @@ RM = rm -f
 GREP = grep
 
 
-all: $(DIPLOMA_REPORT_PDF).pdf #$(PRACTICE_REPORT_PDF).pdf $(TITLE_PDF).pdf $(TASK_PDF).pdf
+all: $(DIPLOMA_REPORT_PDF).pdf $(PRACTICE_REPORT_PDF).pdf $(TITLE_PDF).pdf $(TASK_PDF).pdf
 
 
 publish_to_dropbox: all
@@ -24,8 +24,14 @@ publish_to_dropbox: all
 	cp $(PRACTICE_REPORT_PDF).pdf $(DROPBOX_PUBLIC)/$(PRACTICE_REPORT_PDF).pdf
 
 fast: *.tex
-	latexmk -pdf -pdflatex="pdflatex" $(DIPLOMA_REPORT_PDF)
-	mv $(DIPLOMA_REPORT_PDF).pdf $(DIPLOMA_REPORT_PDF)-`date +'%m-%d-%H-%M-%S'`.pdf
+	latexmk -xelatex $(DIPLOMA_REPORT_PDF)
+	# mv $(DIPLOMA_REPORT_PDF).pdf $(DIPLOMA_REPORT_PDF)-`date +'%m-%d-%H-%M-%S'`.pdf
+
+# practice: *.tex
+# 	latexmk -pdf -pdflatex="pdflatex" $(PRACTICE_REPORT_PDF)
+
+nice: *.tex
+	latexmk -xelatex $(DIPLOMA_REPORT_PDF)
 
 fastcheck: *.tex
 	$(PDFLATEX) $(DIPLOMA_REPORT_PDF)
@@ -40,6 +46,7 @@ $(DIPLOMA_REPORT_PDF).pdf: *.tex
 	$(BIBTEX) $(DIPLOMA_REPORT_PDF).aux
 	$(PDFLATEX) $(DIPLOMA_REPORT_PDF)
 	$(PDFLATEX) $(DIPLOMA_REPORT_PDF)
+	cp $(DIPLOMA_REPORT_PDF).pdf ../example_diploma.pdf
 
 
 $(PRACTICE_REPORT_PDF).pdf: *.tex
@@ -48,6 +55,14 @@ $(PRACTICE_REPORT_PDF).pdf: *.tex
 	$(PDFLATEX) $(PRACTICE_REPORT_PDF)
 	$(PDFLATEX) $(PRACTICE_REPORT_PDF)
 	cp $(PRACTICE_REPORT_PDF).pdf ../example_practice.pdf
+
+
+$(COURSE_REPORT_PDF).pdf: *.tex
+	$(PDFLATEX) $(COURSE_REPORT_PDF)
+	$(BIBTEX) $(COURSE_REPORT_PDF).aux
+	$(PDFLATEX) $(COURSE_REPORT_PDF)
+	$(PDFLATEX) $(COURSE_REPORT_PDF)
+	cp $(COURSE_REPORT_PDF).pdf ../example_course_project.pdf
 
 $(TITLE_PDF).pdf: *.tex
 	$(PDFLATEX) $(TITLE_PDF)
@@ -61,5 +76,4 @@ cleanall: clean
 
 .PHONY: clean
 clean:
-	$(RM) *.aux *.log *.out *.toc *.gz *.gz\(busy\) *.blg *.bbl $(DIPLOMA_REPORT_PDF).pdf $(TASK_PDF).pdf $(TITLE_PDF).pdf $(PRACTICE_REPORT_PDF).pdf $(COURSE_REPORT_PDF).pdf
-
+	$(RM) *.aux *.log *.out *.toc *.gz *.gz\(busy\) *.blg *.bbl *.fls *.fdb_latexmk *.xdv $(DIPLOMA_REPORT_PDF).pdf $(TASK_PDF).pdf $(TITLE_PDF).pdf $(PRACTICE_REPORT_PDF).pdf $(COURSE_REPORT_PDF).pdf
