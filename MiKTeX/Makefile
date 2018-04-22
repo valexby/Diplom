@@ -30,8 +30,8 @@ fast: *.tex
 # practice: *.tex
 # 	latexmk -pdf -pdflatex="pdflatex" $(PRACTICE_REPORT_PDF)
 
-nice: *.tex
-	latexmk -xelatex $(DIPLOMA_REPORT_PDF)
+practice: *.tex
+	latexmk -xelatex $(PRACTICE_REPORT_PDF)
 
 fastcheck: *.tex
 	$(PDFLATEX) $(DIPLOMA_REPORT_PDF)
@@ -76,4 +76,5 @@ cleanall: clean
 
 .PHONY: clean
 clean:
-	$(RM) *.aux *.log *.out *.toc *.gz *.gz\(busy\) *.blg *.bbl *.fls *.fdb_latexmk *.xdv $(DIPLOMA_REPORT_PDF).pdf $(TASK_PDF).pdf $(TITLE_PDF).pdf $(PRACTICE_REPORT_PDF).pdf $(COURSE_REPORT_PDF).pdf
+	$(RM) *.aux *.log *.out *.toc *.gz *.gz\(busy\) *.blg *.bbl $(DIPLOMA_REPORT_PDF).pdf $(TASK_PDF).pdf $(TITLE_PDF).pdf $(PRACTICE_REPORT_PDF).pdf $(COURSE_REPORT_PDF).pdf
+
