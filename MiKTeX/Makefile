@@ -30,8 +30,8 @@ fast: *.tex
 # practice: *.tex
 # 	latexmk -pdf -pdflatex="pdflatex" $(PRACTICE_REPORT_PDF)
 
-practice: *.tex
-	latexmk -xelatex $(PRACTICE_REPORT_PDF)
+diplom: *.tex
+	latexmk -xelatex $(DIPLOMA_REPORT_PDF)
 
 fastcheck: *.tex
 	$(PDFLATEX) $(DIPLOMA_REPORT_PDF)

@@ -465,17 +465,16 @@
 \renewcommand\@biblabel[1]{#1}
 \makeatother
 
-\lstdefinestyle{fsharpstyle}{
+\lstdefinestyle{Python}{
    xleftmargin=1.25cm,
-   %basicstyle=\footnotesize\ttfamily,
    basicstyle=\fontencoding{T1}\small\ttfamily,
    breaklines=true,
-   columns=fullflexible
+   tabsize=8
 }
 
 \usepackage{changepage}
 \let\OldTexttt\texttt
-\renewcommand{\texttt}[1]{\OldTexttt{\fontencoding{T1}\ttfamily{#1}}}
+\renewcommand{\texttt}[1]{\OldTexttt{\fontencoding{T1}\small\ttfamily{#1}}}
 
 % Приложение
 \newcounter{appendix}
