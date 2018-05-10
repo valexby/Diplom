@@ -174,10 +174,13 @@
 Состояние ячейки Tree LSTM, как и в обычной LSTM, описано двумя векторами: $h_j$ и $c_j$ --- значение скрытого слоя и внутреннего состояния соответственно. Состояние для узла $j$, имеющего множество детей $C(j)$ можно выразить следующим образом:
 \begin{gather}
   \tilde{h_j} = \sum_{k\in{C(j)}}h_k,\\
+  \label{eq:domain:tree_lstm:i}
   i_j = \sigma(W^{(i)}\cdot{x_j} + U^{(i)}\cdot{\tilde{h_j}} + b^{(i)}),\\
   \label{eq:domain:tree_lstm:forget}
   f_{jk} = \sigma(W^{(f)}\cdot{x_j} + U^{(f)}\cdot{h_k} + b^{(f)}),\\
+  \label{eq:domain:tree_lstm:o}
   o_j = \sigma(W^{(o)}\cdot{x_j} + U^{(o)}\cdot{\tilde{h_j}} + b^{(o)}),\\
+  \label{eq:domain:tree_lstm:u}
   u_j = \tan(W^{(u)}\cdot{x_j} + U^{(u)}\cdot{\tilde{h_j}} + b^{(u)}),\\
   c_j = i_j\odot{u_j} + \sum_{k\in{C(j)}}f_{jk}\odot{c_k},\\
   h_j = o_j\odot{\tan(c_j)},

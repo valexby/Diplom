@@ -46,7 +46,7 @@ class Item(Base, DeclarativeBase):
 
 Класс \texttt{models.ItemSubCategory} представляет подкатегорию товара в онлайн магазине. Публичные поля \texttt{id} типа \texttt{sqlalchemy.Integer}, \texttt{name} типа \texttt{sqlalchemy.String} и \texttt{category} типа \texttt{models.Category} хранят соответственно идентификатор в базе данных, название подкатегории и сслыку на объект категории, к которой данная подкатегория принадлежит. Так как подкатегория --- это составная часть категории, то при удалении объекта категории должен удаляться и объект подкатегории, на который ссылается объект категории, то между классами \texttt{models.ItemSubCategory} и \texttt{models.Category} устанавливается связь типа композиции, направленная от подкатегории к категории, как видно из приведенной на чертеже ГУИР.400201.009 РР.1 диаграммы классов.
 
-Класс \texttt{models.CategoryLink} представляет ассоциативную таблицу для связи товара с его подкатегорией. Так как каждый товар может состоять в произвольном количестве подкатегорий, а подкатегория может содержать произвольное количество товаров, то между ними связь вида много ко многим. Таким образом, каждый объект класса данной ассоциативной таблицы представляет связь между объектом подкатегории и объектом товара. Класс \texttt{models.CategoryLink} имеет публичное поле \texttt{sub\_category} типа \texttt{models.ItemSubCategory}, которое хранит ссылку на объект класса подкатегории. При удалении подкатегории свзяь так же должна разрушаться. Поэтому из класса ассоциативной таблицы \texttt{models.CategoryLink} исходит связь вида композиция в сторону класса подкатегории \texttt{models.ItemSubCategory}, что видно из диаграммы классов на чертеже ГУИР.400201.009.РР1.1. Также \texttt{models.CategoryLink} хранит ссылку на объект товара в публичном поле \texttt{item} типа \texttt{models.Item}. Так как при разрушении объекта товара связь между товаром и подкатегорией теряет смысл, то объект типа \texttt{models.CategoryLink} также должен быть уничтожен. Таким образом от класса ассоциативной таблицы \texttt{models.CategoryLink} исходит связь типа композиции в сторону класса товара \texttt{Item}. Данная композиция отражена на диаграмме классов, изображенной на чертеже ГУИР.400201.009.РР.1.
+Класс \texttt{models.CategoryLink} представляет ассоциативную таблицу для связи товара с его подкатегорией. Так как каждый товар может состоять в произвольном количестве подкатегорий, а подкатегория может содержать произвольное количество товаров, то между ними связь вида много ко многим. Таким образом, каждый объект класса данной ассоциативной таблицы представляет связь между объектом подкатегории и объектом товара. Класс \texttt{mo\-dels.CategoryLink} имеет публичное поле \texttt{sub\_category} типа \texttt{models.Item\-SubCategory}, которое хранит ссылку на объект класса подкатегории. При удалении подкатегории свзяь так же должна разрушаться. Поэтому из класса ассоциативной таблицы \texttt{models.CategoryLink} исходит связь вида композиция в сторону класса подкатегории \texttt{models.ItemSubCategory}, что видно из диаграммы классов на чертеже ГУИР.400201.009.РР1.1. Также \texttt{models.Cate\-goryLink} хранит ссылку на объект товара в публичном поле \texttt{item} типа \texttt{mo\-dels.Item}. Так как при разрушении объекта товара связь между товаром и подкатегорией теряет смысл, то объект типа \texttt{models.CategoryLink} также должен быть уничтожен. Таким образом от класса ассоциативной таблицы \texttt{mo\-dels.CategoryLink} исходит связь типа композиции в сторону класса товара \texttt{Item}. Данная композиция отражена на диаграмме классов, изображенной на чертеже ГУИР.400201.009.РР.1.
 
 Следующие классы являются объектно-реляционными отображениями:
 \begin{itemize}
@@ -166,3 +166,178 @@ class Item(Base, DeclarativeBase):
 Переменная \texttt{response} типа хранит ответы на REST запросы. Так же множество различных локальных переменных введены для хранения промежуточных результатов преобразования из JSON в объект. Методы \texttt{save\_film\_info} и \texttt{save\_item\_info} формируют конечную транзацкию в базу данных.
 
 Наконец, задача метода \texttt{get\_missing} проверить целостность данных в базе. Для этого используется схожий набор переменных: \texttt{params} и \texttt{response} для управления REST запросами. Для проверки целостности со стороны клиента используются массивы класса \texttt{item\_reviews}, \texttt{seller\_reviews} и \texttt{film\_reviews}.
+\subsection{Модуль ячейки Tree LSTM}
+Класс \texttt{cstlstm.ChildSumTreeLSTMCell} выделен в модуль ячейки Tree LSTM за счет его математической сложности. Класс имеет следующие поля:
+\begin{itemize}
+\item \texttt{unit\_number};
+\item \texttt{forget\_bias};
+\item \texttt{forget\_signals};
+\item \texttt{iou\_signals};
+\item \texttt{input\_transform}.
+\end{itemize}
+Для удобства вычилсений произведены приобразование рассчетов состояний нейронов в узле Child Sum Tree LSTM следующим образом:
+\begin{gather}
+  \label{eq:func:lstm:i}
+  i_{jk} = \sigma(W^{(i)}\cdot{x_j} + U^{(i)}\cdot{\tilde{h_j}} + b^{(i)}) = \sigma({V^{(i)}\cdot{
+      \begin{bmatrix}
+        x_j\\
+        h_j
+      \end{bmatrix}} + b^{(i)}}),\\
+  \label{eq:func:lstm:forget}
+  f_{jk} = \sigma(W^{(f)}\cdot{x_j} + U^{(f)}\cdot{h_k} + b^{(f)}) = \sigma({V^{(f)}\cdot{
+      \begin{bmatrix}
+        x_j\\
+        h_j
+      \end{bmatrix}} + b^{(f)}}),\\
+  \label{eq:func:lstm:o}
+  o_{jk} = \sigma(W^{(o)}\cdot{x_j} + U^{(o)}\cdot{h_j} + b^{(o)}) = \sigma({V^{(o)}\cdot{
+      \begin{bmatrix}
+        x_j\\
+        h_j
+      \end{bmatrix}} + b^{(o)}}),\\
+  \label{eq:func:lstm:u}
+  u_{jk} = \sigma(W^{(u)}\cdot{x_j} + U^{(u)}\cdot{h_j} + b^{(u)}) = \sigma({V^{(u)}\cdot{
+      \begin{bmatrix}
+        x_j\\
+        h_j
+      \end{bmatrix}} + b^{(u)}}),\\
+  \label{eq:func:lstm:transform}
+  c_j = i_j\odot{u_j} + \sum_{k\in{C(j)}}f_{jk}\odot{c_k},
+\end{gather}
+\begin{explanationx}
+\item [где]       $\begin{bmatrix}x_j\\h_j\end{bmatrix}$ --- конкатенация векторов $x_j$ и $h_j$;
+\item $V$ --- это конкатенация матриц весов $W$ и $H$.
+\end{explanationx}
+
+Публичное поле \texttt{unit\_number} имеет тип \texttt{int}. Хранит количество нейронов скрытого слоя нейронной сети в архитектуре Child-Sum Tree LSTM\@. Далее, публичное поле \texttt{forget\_bias} типа \texttt{float} содержит $b^{(f)}$ применяющийся в формуле~\ref{eq:func:lstm:forget}. Публичное поле \texttt{forget\_signals} типа \texttt{keras.Layers.Dense} описывает само уравнение~\ref{eq:func:lstm:forget}. \texttt{keras.Layers.Dense} является реализацией базового слоя нейронной сети. В данном слое будут две обучаемые переменные: матрица весов и вектор сдвига. Они соответствуют членам формулы $W^{(f)}$, $U^{(f)}$ и $b^{(f)}$. Класс \texttt{keras.Layers.Dense} поддерживает автоматическое вычисление градиента и оптимизацию обучаемых переменных. Публичное поле \texttt{iou\_signals} типа \texttt{keras.Layers.Dense} выполняет схожую функцию для одновременного вычисления сигналов, описанных формулами~\ref{eq:func:lstm:i},~\ref{eq:func:lstm:o} и~\ref{eq:func:lstm:u}.
+
+Последнее публичное поле \texttt{input\_transform} типа \texttt{keras.Layers.Dense} реализует~\ref{eq:func:lstm:transform}.
+
+Код инициализации класса \texttt{cstlstm.ChildSumTreeLSTMCell} представлен в листинге ниже:
+
+\medskip
+\begin{lstlisting}[style=Python]
+  super(ChildSumTreeLSTMCell, self).__init__()
+  self.unit_number = unit_number
+  self.forget_bias = forget_bias
+  self.forget_signals = layers.Dense(unit_number, input_shape=(300 + unit_number,), kernel_regularizer=tf.keras.regularizers.l2(reg_factor))
+  self.iou_signals = layers.Dense(unit_number * 3, kernel_regularizer=tf.keras.regularizers.l2(reg_factor))
+  self.input_transform = layers.Dense(unit_number, kernel_regularizer=tf.keras.regularizers.l2(reg_factor))
+\end{lstlisting}
+\medskip
+
+Как видно в листинге, полносвязные слои, такие как \texttt{forget\_signals}, \texttt{iou\_signals} и \texttt{input\_transform}, в качестве параметра конструктора получают также объект типа \texttt{keras.regularizers.l2}. Данный параметр задаст регуляризацию L2, для того чтобы смесить математическое ожидание ближе к верному предсказанию за счет увеличения дисперсии.
+
+Класс \texttt{cstlstm.ChildSumTreeLSTMCell} имеет только один метод \texttt{call(self, inputs, *args, **kwargs)}. Это переопределенный метод класса \texttt{keras.Layers.Model}. Данный метод вызывается, когда проиходит обращение к объекту типа \texttt{keras.Layers.Model} в ходе выполнения графа обработки Tensorflow. Параметр \texttt{inputs} типа \texttt{tensorflow.Tensor} содержит входные данные в виде многомерного массива. Задача метода в том, чтобы обработать входной тензор согласно логике слоя Child-Sum Tree LSTM и затем вернуть результат в формате \texttt{tensorflow.Tensor}.
+
+\subsection{Модуль анализатора}
+В модуль анализатора включены следующие классы:
+\begin{itemize}
+\item \texttt{cstlstm.ChildSumTreeLSTMClassifier};
+\item \texttt{train.Train};
+\item \texttt{train.Treebank};
+\item \texttt{inference.Inference}.
+\end{itemize}
+Их задача в том, чтобы обучать модель Child-Sum Tree LSTM, и делать предсказания тональностей для некоторых наборов данных.
+
+Класс \texttt{cstlstm.ChildSumTreeLSTMClassifier} реализует архитектуру Child-Sum Tree LSTM\@. Данный класс обладает следующими публичными полями:
+\begin{itemize}
+\item \texttt{embed};
+\item \texttt{projection};
+\item \texttt{encoder};
+\item \texttt{output\_layer};
+\item \texttt{dropout};
+\item \texttt{reg\_factor};
+\item \texttt{loss};
+\item \texttt{result};
+\item \texttt{fine};
+\item \texttt{binary};
+\item \texttt{root\_fine};
+\item \texttt{root\_binary}.
+\end{itemize}
+
+Публичное поле \texttt{embed} типа \texttt{tensorflow.Tensor} представляет собой матрицу встраивания слов.
+
+Tensorflow --- это фреймворк, задача которого в, общем случае, упростить реализацию каких-то операций линейной алгебры, для выполнения их на графических процессорах, или тенсорных процессорах. Центральный процессор, и графический процессор или тенсорный процессор имеют раздельную память. Операции пересылки данных из памяти одного устройства в память другого довольно затратные и значительно замедляют результирующую производительность. Хотя в подавляющем большинстве случаев обращаются к выполнению вычислений на графических или тенсорных процессорах именно с целью повышения производительности алгоритма в сравнении с производительностью его выполнения на центральном процессоре. Поэтому, с целью сократить количество пересылок между устройствами памяти, фреймворки, созданные для реализации алгоритмов на графических процессорах, такие как Tensorflow или Theano, строят граф алгоритма, где четко заданы потоки перемещения и обработки данных.
+
+Класс \texttt{tensorflow.Tensor} --- это бызовый класс Tensorflow, который представляет вывод какой-либо операции в графе выполнения алгоритма в Tensorflow. Объект типа \texttt{tenosorflow.Tensor} --- это символьный контроллер вывода операции, он не содержит самого численного результата выполнения операции. Но вместо этого он предоставляет возможность вычислить значение с помощью \texttt{tensorflow.Session}. У класса \texttt{tensorflow.Tenser} два основных предназначения:
+\begin{itemize}
+\item Объект \texttt{tensorflow.Tensor} может быть передан другой операции. Это создаст связь между операциями в графе выполнения Tensorflow.
+\item После того как граф был запущен в \texttt{tensorflow.Session}, значение результата операции может быть получено с помощью \texttt{tensorflow.Session.run}. \texttt{tensorflow.Tensor.eval()} --- это сокращение для \texttt{tensorflow.Session.run()}
+\end{itemize}
+
+Публичное поле \texttt{embed} типа \texttt{tensorflow.Tensor} хранит константный двумерный массив, в каждой строке которой хранится некоторый вектор из модели GloVe.
+
+Встраивание слов производится с помощью модели GloVe, которая обучена для кодировки семантики слов на основе контекста их использования. Однако, чтобы сделать модель более применимой для задачи классификации тональностей, её возможно дообучить. Продолжать тренировать модель GloVe одновременно с моделью Tree LSTM --- это крайне неэффективное решение, так как хотя бы сама модель в сжатом виде занимает 5 гигабайт дискового пространства. А вычисление градиента и последующая оптимизация такого количества векторов займет невероятно много времени. Поэтому оригинальная модель GloVe фильтруется. В ней оставляют только слова, использующиеся в тренировочном наборе данных. Отфильтрованная под Стенфордский набор синтаксических деревьев модель GloVe занимает уже 80 мегабайт дискового простанства. Затем, чтобы дообучать векторы из отфильтрованной модели GloVe, вводится ещё один слой нейронной сети. Это полносвязный слой, имеющий такое же количество нейронов, как и вектор GloVe. Таким образом, размерность векторов меняться не будет, однако их значение будет  оптимизироваться одновременно с параметрами всей архитектуры Child-Sum Tree LSTM во время процесса обучения. Задачу данного полносвязного слоя и выполняет публичное поле \texttt{projection} типа \texttt{keras.Layers.Dense} класса \texttt{cstlstm.ChildSumTreeLSTMClassifier}.
+
+Конструктор класса \texttt{cstlstm.ChildSumTreeLSTMClassifier} представлен ниже:
+\medskip
+\begin{lstlisting}[style=Python]
+  def __init__(self, embed, unit_numb=150, class_numb=5, reg_factor=0.0001, keep_prob=0.5):
+    super(ChildSumTreeLSTMClassifier, self).__init__()
+    self.embed = tf.constant(embed)
+    self.projection = layers.Dense(self.embed.shape[1], kernel_regularizer=tf.keras.regularizers.l2(reg_factor))
+    self.encoder = ChildSumTreeLSTMCell(unit_numb, reg_factor)
+    self.output_layer = layers.Dense(class_numb, kernel_regularizer=tf.keras.regularizers.l2(reg_factor))
+    self.dropout = layers.Dropout(keep_prob)
+    self.reg_factor = reg_factor
+    self.loss = 0
+    self.result = []
+    self.fine = tfe.metrics.Accuracy()
+    self.binary = tfe.metrics.Accuracy()
+    self.root_fine = tfe.metrics.Accuracy()
+    self.root_binary = tfe.metrics.Accuracy()
+    super(ChildSumTreeLSTMCell, self).__init__()
+    self.unit_number = unit_number
+    self.forget_bias = forget_bias
+    self.forget_signals = layers.Dense(unit_number, input_shape=(300 + unit_number,), kernel_regularizer=tf.keras.regularizers.l2(reg_factor))
+    self.iou_signals = layers.Dense(unit_number * 3, kernel_regularizer=tf.keras.regularizers.l2(reg_factor))
+    self.input_transform = layers.Dense(unit_number, kernel_regularizer=tf.keras.regularizers.l2(reg_factor))
+\end{lstlisting}
+\medskip
+
+Публичное поле \texttt{encoder} типа \texttt{cstlstm.ChildSumTreeLSTMCell} представляет ячейку Child-Sum Tree LSTM, которая встраивается в общий поток выполнения графа Tensorflow.
+
+Далее, публичное поле \texttt{output\_layer} типа \texttt{keras.Layers.Dense}, представляет собой логическую регрессию. Логическая регрессия применяется после того, как предложение представлено в виде плотного вектора. Логическая регрессия обучается одновременно с моделью Child-Sum Tree LSTM\@. Логическая регрессия регуляризуется методом L2.
+
+Публичное поле \texttt{dropout} типа \texttt{keras.Layers.Dropout} представляет реализацию техники исключения. Суть данного метода в том, что во время обучения нейронной сети отключаются случайным образом некоторые нейроны и не учавствуют в итерации обучения на некотором наборе данных. Это позволяет избежать переобучения модели, точно как и регуляризация параметров.
+
+Публичное поле \texttt{reg\_factor} содержит коэффициент регуляризации. Являясь одним из гиперпараметров архитектуры, \texttt{reg\_factor} позволяет балансировать значимостью в процессе противодействия переобучению методов регуляризации и исключения.
+
+Публичное поле \texttt{result} типа \texttt{int[]} является массивом целых чисел, и хранит результаты предсказаний тональности в порядке развертки синтаксического дерева. То есть во время рекурсивного обхода дерева поиском в глубину, на каждой итерациии будет производится предсказание тональности для текущего узла. Результат каждого предсказания будет сохраняться в массив \texttt{result} в порядке обхода. Затем, эта последовательность будет восстанавливаться, параллельно создавая деверо визуализации.
+
+Следующие четыре поля содержат метрики. Метрики бывают двух типов относительно того, когда они считаются:
+\begin{itemize}
+\item fine-graded --- предсказание делается для пяти классов;
+\item бинарное --- предсказание делается только для двух классов.
+\end{itemize}
+
+Так же метрики делятся на два типа относительно момента их вычисления:
+\begin{itemize}
+\item корневые метрики --- вычисляются для всего дерева, только в момент предсказания для корня синтаксического дерева;
+\item узловые метрики --- вычисляются на всех итерациях обработки дерева.
+\end{itemize}
+
+Таким образом комбинация этих двух свойств дают четыре метрики:
+\begin{itemize}
+\item \texttt{fine} --- fine-graded узловая;
+\item \texttt{binary} --- бинарная узловая;
+\item \texttt{root\_fine} --- fine-graded корневая;
+\item \texttt{root\_binary} бинарная корневая.
+\end{itemize}
+
+Каждое из этих полей имеет тип \texttt{tenosorflow.metrics.Accuracy}. Данный класс аккумулирует предсказания и тренировочные данные, чтобы затем высчитать точность модели на некотором наборе данных.
+
+Публичный метод \texttt{reset\_metrics(self)} класса \texttt{cstlstm.ChildSumTreeLSTMClassifier} необходим для того, чтобы сбрасывать результаты прошлых итераций обработки набора данных. Данный метод возвращает \texttt{None}, то есть является процедурой.
+
+Публичный метод \texttt{model\_variables(self)} класса \texttt{cstlstm.ChildSumTreeLSTMClassifier} возвращает список обучаемых параметров, которые будут изменяться в ходе оптимизации. Однако, из-за механизма дообучения встраивания слов, скорость обучения проекции GloVe на порядок меньше скорости обучения всей остальной модели. По этой причине метод \texttt{model\_variables(self)} возвращает список обучаемых параметров за исключением параметров проекции векторов из модели GloVe.
+
+Публичный метод \texttt{embed\_variables(self)} класса \texttt{cstlstm.ChildSumTreeLSTMClassifier} возвращает список обучаемых переменных слоя проекции векторов из модели GloVe. Данные списки параметров, возвращаемые методами \texttt{embed\_variables(self)} и \texttt{model\_variables(self)} передаются в функции вычисления градиента, чтобы впоследствии оптимизировать эти параметры в соответствии с функцией потерь.
+
+Публичный метод \texttt{call(self, inputs, training=None, *args, **kwargs)} класса \texttt{cstlstm.ChildSumTreeLSTMClassifier} --- это переопределенный метод класса \texttt{keras.Layers.Model}. Данный метод вызывается, когда проиходит обращение к объекту типа \texttt{keras.Layers.Model} в ходе выполнения графа обработки Tensorflow. Параметр \texttt{inputs} типа \texttt{tensorflow.Tensor} содержит входные данные в виде многомерного массива. В данном случае \texttt{inputs} --- это тензор строк, где в формате JSON хранятся синтаксические деревья. Параметр \texttt{training} типа \texttt{bool} содержит информацию о том, запущена ли модель в каком из двух режимов запущена модель: предсказание или обучение.
+
+Публичный метод \texttt{eval\_tree(self, tree, is\_root=True)} класса \texttt{cstlstm.ChildSumTreeLSTMClassifier} --- это метод рекурсивного поиска в глубину, для обработки синтаксического дерева. Параметр \texttt{tree} типа \texttt{list} содержит входное синтаксическое дерево зависимостей. Параметр \texttt{is\_root} хранит флаг, отвечающий за то, находится ли сейчас рекрсия в корневом узле синтаксического дерева зависимостей или нет. Этот параметр важен для правильного подсчета метрик.
+
+Публичный метод \texttt{checkpoint(self)} класса \texttt{cstlstm.ChildSumTreeLSTMClassifier} возвращает объект типа \texttt{tensorflow.contrib.eager.Checkpointable}, который сериализует и десериализует модель. % Здесь можно ещё много всего соченить
+
+Класс \texttt{train.Treebank} контролируюет прогресс обработки некоторого набора данных. При создании объекта типа \texttt{train.Treebank} будет выгружен набор данных из базы данных или из файла. Затем, во время итерации по набору данных можно будет изображать прогресс выполнения с помощью вызова метода \texttt{print\_progress\_bar}. Данный метод будет рассчитывать текущий прогресс основываясь на публичном поле класса \texttt{train.Treebank} \texttt{size}, который хранит размер всего набора данных. Это необходимо, так как инструменты контроля набора данных в Tensorflow не поддерживают такой возможности.
