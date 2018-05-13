@@ -438,7 +438,6 @@ Tensorflow --- это фреймворк, задача которого в, об
 Класс \texttt{train.Train} хранит ссылку на объект класса \texttt{cstlstm.ChildSum\-TreeLSTMClassifier} и является независимым, поэтому от класса \texttt{train.Tra\-in} направлена связь типа агрегации в сторону класса \texttt{cstlstm.ChildSumTree\-LSTMClassifier}. Данная агрегация отображена на диаграмме классов, изображенной на чертеже ГУИР.400201.009.РР.1.
 
 Ниже показан конструктор класса \texttt{train.Train}:
-
 \medskip
 \begin{lstlisting}[style=Python]
   def __init__(self, epochs, learning_rate, embedding_learning_rate_factor, checkpoint_dir, embed_dir):
