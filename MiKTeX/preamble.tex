@@ -474,7 +474,7 @@
 
 \usepackage{changepage}
 \let\OldTexttt\texttt
-\renewcommand{\texttt}[1]{\OldTexttt{\fontencoding{T1}\small\ttfamily{#1}}}
+\renewcommand{\texttt}[1]{\OldTexttt{\fontencoding{T1}\ttfamily{#1}}}
 
 % Приложение
 \newcounter{appendix}
@@ -488,5 +488,5 @@
     \addcontentsline{toc}{section}{ПРИЛОЖЕНИЕ \theappendix}                          % Добавление в toc.
   }
 
-\setlength{\abovedisplayskip}{14pt}
-\setlength{\belowdisplayskip}{14pt}
+% \setlength{\abovedisplayskip}{14pt}
+% \setlength{\belowdisplayskip}{14pt}
