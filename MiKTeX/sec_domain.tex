@@ -36,7 +36,7 @@
   \label{eq:domain:word2vec:J}
   J(\Theta) = -\frac{1}{T}\sum_{t=1}^{T}\sum_{\substack{-m\leq j \geq m\\j \neq 0}}\log(p(w_{t+j}|w_{t})).
 \end{gather}
-Для предсказания вероятности слова в контексте применяется функция softmax, описанная в общем виде в выражении
+Для предсказания вероятности слова в контексте применяется функция \en{softmax}, описанная в общем виде в выражении
 \begin{gather}
   \label{eq:domain:softmax}
   {\sigma(z)}_i = \frac{e^{z_i}}{\sum_{k=1}^{K}e^{z_k}}.
