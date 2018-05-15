@@ -488,5 +488,12 @@
     \addcontentsline{toc}{section}{ПРИЛОЖЕНИЕ \theappendix}                          % Добавление в toc.
   }
 
+\usepackage{afterpage}
+
+\newcommand\blankpage{%
+    \null
+    \thispagestyle{empty}%
+    \addtocounter{page}{-1}%
+    \newpage}
 % \setlength{\abovedisplayskip}{14pt}
 % \setlength{\belowdisplayskip}{14pt}

@@ -369,12 +369,12 @@ Tensorflow --- это фреймворк, задача которого в, об
 
 \begin{center}
   \includegraphics[height=6cm]{learning_rate.png}
-  \captionof{figure}{Зависимость ошибки нейронной сети от количества пройденных этапов обучения, указанная для различных значений скорости обучения.\cite{stanford_course}.}\label{fig:func:learning_rate}
+  \captionof{figure}{Зависимость ошибки нейронной сети от количества пройденных этапов обучения, указанная для различных значений скорости обучения\cite{stanford_course}.}\label{fig:func:learning_rate}
 \end{center}
 
 \begin{center}
   \includegraphics[height=6cm]{learning_rate2.png}
-  \captionof{figure}{Сходимость функции потерь.\cite{stanford_course}.}\label{fig:func:learning_rate2}
+  \captionof{figure}{Сходимость функции потерь\cite{stanford_course}.}\label{fig:func:learning_rate2}
 \end{center}
 
 Публичное поле \texttt{embedding\_learning\_rate\_factor} типа \texttt{float} класса \texttt{train.Train} хранит коэффициент замедления скорости обучения слоя проекции встраивания слов. Так как при обучении модели происходит дообучение векторов модели GloVe, то, чтобы сохранить стабильность системы, необходимо использовать замедление скорости обучения. Замедляется встраивание слов, так как оригинальная модель GloVe обучалась без учителся на огромных наборах данных очень долгое время. Поэтому быстрое обучение на наборе из десяти тысяч синтаксических деревьев зависимотсей нарушит стабильность модели GloVe.
@@ -444,7 +444,7 @@ Tensorflow --- это фреймворк, задача которого в, об
 
 \begin{center}
   \includegraphics[height=6cm]{batch_size.png}
-  \captionof{figure}{Влияение размера группы на процесс обучения.\cite{stanford_course}.}\label{fig:func:batch_size}
+  \captionof{figure}{Влияение размера группы на процесс обучения\cite{stanford_course}.}\label{fig:func:batch_size}
 \end{center}
 
 Публичный метод \texttt{dev\_eval} класса \texttt{train.Train} имеет следующие входные параметры:
