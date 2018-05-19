@@ -231,7 +231,7 @@ Tensorflow --- это фреймворк, задача которого в, об
 Класс \texttt{tensorflow.Tensor} --- это бызовый класс Tensorflow, который представляет вывод какой-либо операции в графе выполнения алгоритма в Tensorflow. Объект типа \texttt{tenosorflow.Tensor} --- это символьный контроллер вывода операции, он не содержит самого численного результата выполнения операции. Но вместо этого он предоставляет возможность вычислить значение с помощью \texttt{tensorflow.Session}. У класса \texttt{tensor\-flow.Tenser} два основных предназначения:
 \begin{itemize}
 \item Объект \texttt{tensorflow.Tensor} может быть передан другой операции. Это создаст связь между операциями в графе выполнения Tensorflow.
-\item После того как граф был запущен в \texttt{tensorflow.Session}, значение результата операции может быть получено с помощью функциии \texttt{ten\-sorflow.Sessi\-on.run}. \texttt{tensorflow.Tensor.eval()} --- это сокращение для \texttt{tensorflow.Ses\-sion.run()}
+\item После того как граф был запущен в \texttt{tensorflow.Session}, значение результата операции может быть получено с помощью функциии \texttt{ten\-sorflow.Sessi\-on.run}. \texttt{tensorflow.Tensor.eval()} --- это сокращение для \texttt{tensorflow.Ses\-sion.run()}.
 \end{itemize}
 
 Публичное поле \texttt{embed} типа \texttt{tensorflow.Tensor} хранит константный двумерный массив, в каждой строке которой хранится некоторый вектор из модели GloVe.
@@ -349,13 +349,13 @@ Tensorflow --- это фреймворк, задача которого в, об
 
 Класс \texttt{train.Train} контролирует процесс обучения модели Child-Sum Tree LSTM\@. Имеет следующие публичные поля:
 \begin{itemize}
-\item \texttt{epochs}
-\item \texttt{learning\_rate}
-\item \texttt{embedding\_learning\_rate}
-\item \texttt{model}
-\item \texttt{model\_optimizer}
-\item \texttt{embedding\_optimizer}
-\item \texttt{checkpoint}
+\item \texttt{epochs};
+\item \texttt{learning\_rate};
+\item \texttt{embedding\_learning\_rate};
+\item \texttt{model};
+\item \texttt{model\_optimizer};
+\item \texttt{embedding\_optimizer};
+\item \texttt{checkpoint}.
 \end{itemize}
 
 Публичное поле \texttt{epochs} типа \texttt{int} класса \texttt{train.Train} хранит количество эпох обучения архитектуры Child-Sum Tree LSTM\@. За одну эпоху обучения модель обрабатывает весь тренировочный набор данных. Слишком низкое количество эпох может привести к недостаточному обучению модели. Слишком высокое, наоборот, может привести к переобучению. Либо же, если при оптимизации точность модели не будет сходиться, то большее количество эпох свыше какого-то порога сходимости не даст прироста производительности модели Child-Sum Tree LSTM\@. На рисунке~\ref{fig:func:epoches} показан пример зависимости ошибки нейронной сети от пройденных эпох обучения.
