@@ -2,7 +2,7 @@
 
 \begin{document}
 
-\input{diploma_title} % page 1
+% \input{diploma_title} % page 1
 
 % \input{abstract} % page 2
 
@@ -14,9 +14,9 @@
 
 %\input{review} % not part of report
 
-\setcounter{page}{5}
-
 \input{table_of_contents}
+
+\setcounter{page}{6}
 
 \input{diploma_content}
 
@@ -27,6 +27,7 @@
 % Microoft Office и сохранены в pdf.
 % \includepdf[pages={-}]{documents_list.pdf}
 
-\input{appendix}
+\include{sec_application}
+\include{appendix}
 
 \end{document}

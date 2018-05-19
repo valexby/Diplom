@@ -1,0 +1,988 @@
+\appendix
+
+\appendixtitle{обязательное}{Листинг кода}
+
+\begin{center}Модуль \texttt{cstlstm}\end{center}
+
+\begin{lstlisting}[style=app]
+import json
+
+import numpy as np
+import tensorflow as tf
+import tensorflow.contrib.eager as tfe
+
+
+layers = tf.keras.layers
+
+
+class ChildSumTreeLSTMCell(tf.keras.Model):
+
+    def __init__(self, unit_number, reg_factor, forget_bias=1.0):
+        super(ChildSumTreeLSTMCell, self).__init__()
+        self.unit_number = unit_number
+        self.forget_bias = forget_bias
+        self.forget_signals = layers.Dense(unit_number, input_shape=(300 + unit_number,), kernel_regularizer=tf.keras.regularizers.l2(reg_factor))
+        self.iou_signals = layers.Dense(unit_number * 3, kernel_regularizer=tf.keras.regularizers.l2(reg_factor))
+        self.input_transform = layers.Dense(unit_number, kernel_regularizer=tf.keras.regularizers.l2(reg_factor))
+
+    def call(self, inputs, *args, **kwargs):
+        input_word, child_c, child_h = inputs
+        child_h_sum = tf.reduce_sum(child_h, 0)
+        concat = tf.concat([input_word, child_h_sum], 1)
+        i, o, u = tf.split(self.iou_signals(concat), 3, axis=1)
+        i, o, u = tf.sigmoid(i), tf.sigmoid(o), tf.tanh(u)
+        f = self.forget_signals(child_h) + self.input_transform(input_word) + self.forget_bias
+        f = tf.sigmoid(f)
+        c = (i * u) + tf.reduce_sum(f * child_c, 0)
+        h = o * tf.tanh(c)
+        return c, h
+
+
+class ChildSumTreeLSTMClassifier(tf.keras.Model):
+
+    def __init__(self, embed, unit_numb=150, class_numb=5, reg_factor=0.0001, keep_prob=0.5):
+        super(ChildSumTreeLSTMClassifier, self).__init__()
+        self.embed = tf.constant(embed)
+        self.projection = layers.Dense(self.embed.shape[1], kernel_regularizer=tf.keras.regularizers.l2(reg_factor))
+        self.encoder = ChildSumTreeLSTMCell(unit_numb, reg_factor)
+        self.output_layer = layers.Dense(class_numb, kernel_regularizer=tf.keras.regularizers.l2(reg_factor))
+        self.dropout = layers.Dropout(keep_prob)
+        self.reg_factor = reg_factor
+        self.loss = 0
+        self.result = []
+        self.fine = tfe.metrics.Accuracy()
+        self.binary = tfe.metrics.Accuracy()
+        self.root_fine = tfe.metrics.Accuracy()
+        self.root_binary = tfe.metrics.Accuracy()
+
+    def reset_metrics(self):
+        self.loss = 0
+        self.result = []
+        self.fine = tfe.metrics.Accuracy()
+        self.binary = tfe.metrics.Accuracy()
+        self.root_fine = tfe.metrics.Accuracy()
+        self.root_binary = tfe.metrics.Accuracy()
+
+    @property
+    def model_variables(self):
+        return self.encoder.variables + self.output_layer.variables
+
+    @property
+    def embed_variables(self):
+        return self.projection.variables
+
+    def _add_metrics(self, label, logits):
+        if label == 9:
+            return
+        self.loss += tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits[0], labels=label)
+        prediction = tf.cast(tf.argmax(logits[0]), tf.int32)
+        self.result.append(prediction)
+        self.fine(label, prediction)
+        if label != 2:
+            self.binary(int(label > 2), tf.cast(prediction > 2, tf.int32))
+
+    def call(self, inputs, training=None, *args, **kwargs):
+        out = tf.map_fn(lambda tree: self.eval_tree(json.loads(tree.numpy())),
+                        inputs,
+                        dtype='int32')
+        # for tree in inputs:
+        #     out = self.eval_tree(json.loads(inputs.numpy()))
+        return out
+
+    def eval_tree(self, tree, is_root=True):
+        sentiment = tree[0]
+        word = tree[1][0]
+        childs = tree[1][1]
+        if word == -1:
+            word_embed = tf.random_uniform((self.embed.shape[1],), -0.05, 0.05)
+        else:
+            word_embed = tf.nn.embedding_lookup(self.embed, word)
+        word_embed = tf.reshape(word_embed, (1, word_embed.shape[0]))
+        word_embed = self.projection(word_embed)
+        word_embed = self.dropout(word_embed)
+        child_h = []
+        child_c = []
+        for child in childs:
+            child_state = self.eval_tree(child, is_root=False)
+            child_c.append(child_state[0])
+            child_h.append(child_state[1])
+        if childs:
+            child_c = tf.convert_to_tensor(child_c)
+            child_h = tf.convert_to_tensor(child_h)
+        else:
+            child_c = tf.zeros((1, 1, self.encoder.unit_number))
+            child_h = tf.zeros((1, 1, self.encoder.unit_number))
+        child_state = self.encoder([word_embed, child_c, child_h])
+        logits = self.output_layer(child_state[1])
+        self._add_metrics(sentiment, logits)
+        if is_root:
+            prediction = tf.cast(tf.argmax(logits[0]), tf.int32)
+            self.result.append(prediction)
+            self.root_fine(sentiment, prediction)
+            if sentiment != 2:
+                self.root_binary(int(sentiment > 2), tf.cast(prediction > 2, tf.int32))
+            return prediction
+        return child_state
+
+    def dev_eval(model, epoch, dev_trees, train_loss):
+        print('epoch:\%4d, train_loss: \%.3e, dev_loss_avg: \%.3e, dev_accuracy:\n  [\%s]'
+              \% (epoch, train_loss, model.loss, evaluate_dataset(model, dev_trees)))
+
+    def checkpoint(self):
+        return tfe.Checkpoint(lstm_froget=self.encoder.forget_signals,
+                              lstm_iou=self.encoder.iou_signals,
+                              lstm_input_transform=self.encoder.input_transform,
+                              emdeb_projection=self.projection,
+                              output_layer=self.output_layer,
+                              dropout=self.dropout)
+
+\end{lstlisting}
+
+\begin{center}Модуль \texttt{inference}\end{center}
+\begin{lstlisting}[style=app]
+#!/usr/bin/env python3
+import sys
+import json
+import codecs
+import numpy as np
+
+import tensorflow as tf
+import tensorflow.contrib.eager as tfe
+import nltk
+
+from nltk.parse.stanford import StanfordDependencyParser
+
+from labeled_trees import LabeledTree
+from cstlstm import ChildSumTreeLSTMClassifier
+
+
+tf.enable_eager_execution()
+
+
+def convert_result(tree, results):
+    root = LabeledTree()
+    if type(tree) == str:
+        root.label = results[0][0]
+        results[0] = results[0][1:]
+        root.text = tree
+        return root
+    root.text = tree.label()
+    for child in tree:
+        root.add_child(convert_result(child, results))
+    root.label = results[0][0]
+    results[0] = results[0][1:]
+    return root
+
+
+def load_embeddings(embedding_path):
+    """Loads embedings, returns weight matrix and dict from words to indices."""
+    print('loading word embeddings from \%s' \% embedding_path)
+    weight_vectors = []
+    word2index = {}
+    with codecs.open(embedding_path, encoding='utf-8') as f:
+        for line in f:
+            word, vec = line.split(u' ', 1)
+            word2index[word] = len(weight_vectors)
+            weight_vectors.append(np.array(vec.split(), dtype=np.float32))
+        # Annoying implementation detail; '(' and ')' are replaced by '-LRB-' and
+        # '-RRB-' respectively in the parse-trees.
+        word2index[u'-LRB-'] = word2index.pop(u'(')
+        word2index[u'-RRB-'] = word2index.pop(u')')
+        # Random embedding vector for unknown words.
+        weight_vectors.append(np.random.uniform(
+            -0.05, 0.05, weight_vectors[0].shape).astype(np.float32))
+        return np.array(weight_vectors, dtype=np.float32), word2index
+
+
+def tree_to_list(tree, embed_indexes):
+    if type(tree) == str:
+        return [0, [embed_indexes[tree], []]]
+    root = [0, [embed_indexes[tree.label()], []]]
+    for child in tree:
+        root[1][1].append(tree_to_list(child, embed_indexes))
+    return root
+
+
+def main():
+    checkpoint_directory = sys.argv[1]
+    path_to_jar = './data/stanford-parser.jar'
+    path_to_models_jar = './data/stanford-parser-3.9.1-models.jar'
+    dependency_parser = StanfordDependencyParser(path_to_jar=path_to_jar, path_to_models_jar=path_to_models_jar)
+    sentence = "This movie doesn't care about cleverness, wit or any other kind of intelligent humor."#input("Input sentence for sentiment analysis, please:\n")
+    tokens = nltk.word_tokenize(sentence)
+    tree = dependency_parser.parse_one(tokens)
+    tree = tree.tree()
+
+    embed, embed_indexes = load_embeddings('./data/filtered_glove.txt')
+    model = ChildSumTreeLSTMClassifier(embed)
+    checkpoint = model.checkpoint()
+    checkpoint.restore(tf.train.latest_checkpoint(checkpoint_directory))
+    json_format = json.dumps(tree_to_list(tree, embed_indexes))
+
+    model(tf.constant([json_format]))
+    result = [label.numpy() for label in model.result]
+    pretty_tree = convert_result(tree, [result])
+    js = "createTrees([{}])\nupdateTrees()".format(pretty_tree.to_json())
+    with open('test.js', 'w') as f:
+        f.write(js)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+\end{lstlisting}
+
+\begin{center}Модуль \texttt{labeled\_tree}\end{center}
+
+\begin{lstlisting}[style=app]
+"""
+Make trees visualizable in an IPython notebook
+"""
+import json
+
+try:
+    from PIL import ImageFont
+    font = ImageFont.core.getfont("/Library/Fonts/Georgia.ttf", 15)
+    def text_size(text):
+        return max(4, font.getsize(text)[0][0])
+except Exception:
+    def text_size(text):
+        # TODO(contributors): make changes here to incorporate cap and uncap unknown words.
+        return max(4, int(len(text) * 1.1))
+
+
+class LabeledTree(object):
+    SCORE_MAPPING = [-12.5,-6.25,0.0,6.25,12.5]
+
+    def __init__(self,
+                 depth=0,
+                 text=None,
+                 label=None,
+                 children=None,
+                 parent=None,
+                 udepth=1):
+        self.label    = label
+        self.children = children if children != None else []
+        self.general_children = []
+        self.text = text
+        self.parent   = parent
+        self.depth    = depth
+        self.udepth   = udepth
+
+    def uproot(tree):
+        """
+        Take a subranch of a tree and deep-copy the children
+        of this subbranch into a new LabeledTree
+        """
+        uprooted = tree.copy()
+        uprooted.parent = None
+        for child in tree.all_children():
+            uprooted.add_general_child(child)
+        return uprooted
+
+    def shrink_tree(tree, final_depth):
+        if tree.udepth <= final_depth:
+            return tree
+        for branch in tree.general_children:
+            if branch.udepth == final_depth:
+                return branch.uproot()
+
+    def shrunk_trees(tree, final_depth):
+        if tree.udepth <= final_depth:
+            yield tree
+        for branch in tree.general_children:
+            if branch.udepth == final_depth:
+                yield branch.uproot()
+
+    def copy(self):
+        """
+        Deep Copy of a LabeledTree
+        """
+        return LabeledTree(
+            udepth = self.udepth,
+            depth = self.depth,
+            text = self.text,
+            label = self.label,
+            children = self.children.copy() if self.children != None else [],
+            parent = self.parent)
+
+    def add_child(self, child):
+        """
+        Adds a branch to the current tree.
+        """
+        self.children.append(child)
+        child.parent = self
+        self.udepth = max([child.udepth for child in self.children]) + 1
+
+    def add_general_child(self, child):
+        self.general_children.append(child)
+
+    def all_children(self):
+        if len(self.children) > 0:
+            for child in self.children:
+                for subchild in child.all_children():
+                    yield subchild
+            yield self
+        else:
+            yield self
+
+    def lowercase(self):
+        """
+        Lowercase all strings in this tree.
+        Works recursively and in-place.
+        """
+        if len(self.children) > 0:
+            for child in self.children:
+                child.lowercase()
+        else:
+            self.text = self.text.lower()
+
+    def to_dict(self, index=0):
+        """
+        Dict format for use in Javascript / Jason Chuang's display technology.
+        """
+        index += 1
+        rep = {}
+        rep["index"] = index
+        rep["leaf"] = len(self.children) == 0
+        rep["depth"] = self.udepth
+        rep["scoreDistr"] = [0.0] * len(LabeledTree.SCORE_MAPPING)
+        # dirac distribution at correct label
+        if self.label is not None:
+            rep["scoreDistr"][self.label] = 1.0
+            mapping = LabeledTree.SCORE_MAPPING[:]
+            rep["rating"] = mapping[self.label] - min(mapping)
+        # if you are using this method for printing predictions
+        # from a model, the the dot product with the model's output
+        # distribution should be taken with this list:
+        rep["numChildren"] = len(self.children)
+        text = self.text if self.text != None else ""
+        seen_tokens = 0
+        witnessed_pixels = 0
+        for i, child in enumerate(self.children):
+            if i > 0:
+                text += " "
+            child_key = "child\%d" \% (i)
+            (rep[child_key], index) = child.to_dict(index)
+            text += rep[child_key]["text"]
+            seen_tokens += rep[child_key]["tokens"]
+            witnessed_pixels += rep[child_key]["pixels"]
+
+        rep["text"] = text
+        rep["tokens"] = 1 if (self.text != None and len(self.text) > 0) else seen_tokens
+        rep["pixels"] = witnessed_pixels + 3 if len(self.children) > 0 else text_size(self.text)
+        return (rep, index)
+
+    def to_json(self):
+        rep, _ = self.to_dict()
+        return json.dumps(rep)
+
+    def display(self):
+        from IPython.display import Javascript, display
+
+        display(Javascript("createTrees(["+self.to_json()+"])"))
+        display(Javascript("updateTrees()"))
+
+    def to_lines(self):
+        if len(self.children) > 0:
+            left_lines, right_lines = self.children[0].to_lines(), self.children[1].to_lines()
+            self_line = [left_lines[0] + " " + right_lines[0]]
+            return self_line + left_lines + right_lines
+        else:
+            return [self.text]
+
+    def to_labeled_lines(self):
+        if len(self.children) > 0:
+            left_lines, right_lines = self.children[0].to_labeled_lines(), self.children[1].to_labeled_lines()
+            self_line = [(self.label, left_lines[0][1] + " " + right_lines[0][1])]
+            return self_line + left_lines + right_lines
+        else:
+            return [(self.label, self.text)]
+
+    def __str__(self):
+        """
+        String representation of a tree as visible in original corpus.
+
+        print(tree)
+        #=> '(2 (2 not) (3 good))'
+
+        Outputs
+        -------
+
+            str: the String representation of the tree.
+
+        """
+        if len(self.children) > 0:
+            rep = "(\%d " \% self.label
+            for child in self.children:
+                rep += str(child)
+            return rep + ")"
+        else:
+            text = self.text\
+                .replace("(", "-LRB-")\
+                .replace(")", "-RRB-")\
+                .replace("{", "-LCB-")\
+                .replace("}", "-RCB-")\
+                .replace("[", "-LSB-")\
+                .replace("]", "-RSB-")
+
+            return ("(\%d \%s) " \% (self.label, text))
+
+    @staticmethod
+    def inject_visualization_javascript(tree_width=1200, tree_height=400, tree_node_radius=10):
+        """
+        In an Ipython notebook, show SST trees using the same Javascript
+        code as used by Jason Chuang's visualisations.
+        """
+        from .javascript import insert_sentiment_markup
+        insert_sentiment_markup(tree_width=tree_width, tree_height=tree_height, tree_node_radius=tree_node_radius)
+\end{lstlisting}
+
+\begin{center}Модуль \texttt{train}\end{center}
+
+\begin{lstlisting}[style=app]
+#!/usr/bin/env python3
+
+import json
+import os
+import sys
+import time
+import codecs
+
+import numpy as np
+import tensorflow as tf
+import tensorflow.contrib.eager as tfe
+
+from cstlstm import ChildSumTreeLSTMClassifier
+
+tf.enable_eager_execution()
+
+
+class Treebank(tf.data.TextLineDataset):
+
+    def __init__(self, data_dir, set_name, embed_indexes):
+        json_path = os.path.join(data_dir, 'json', set_name + '.json')
+        set_path = os.path.join(data_dir, set_name)
+        with codecs.open(json_path, encoding='utf-8') as f:
+            trees = json.load(f)
+        trees = [replace_words_by_index(tree, embed_indexes) for tree in trees]
+        if set_name == 'train':
+            trees = [tree for tree in trees if tree[0] != 2]
+        self.size = len(trees)
+        jsons = ''.join([json.dumps(tree) + '\n' for tree in trees])
+        with open(set_path, 'w') as f:
+            f.write(jsons)
+        super(Treebank, self).__init__(set_path)
+
+    def print_progress_bar(self, iteration):
+        """
+        Call in a loop to create terminal progress bar
+        @params:
+            iteration   - Required  : current iteration (Int)
+            fill        - Optional  : bar fill character (Str)
+        """
+        decimals = 1
+        fill = '█'
+        length = 80
+        percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(self.size)))
+        filledLength = int(length * iteration // self.size)
+        bar = fill * filledLength + '-' * (length - filledLength)
+        print('\rProgress: |\%s| \%s\%\% Complete' \% (bar, percent), end='\r')
+        # Print New Line on Complete
+        if iteration >= self.size:
+            print()
+
+
+def load_embeddings(embedding_path):
+    """Loads embedings, returns weight matrix and dict from words to indices."""
+    print('loading word embeddings from \%s' \% embedding_path)
+    weight_vectors = []
+    word2index = {}
+    with codecs.open(embedding_path, encoding='utf-8') as f:
+        for line in f:
+            word, vec = line.split(u' ', 1)
+            word2index[word] = len(weight_vectors)
+            weight_vectors.append(np.array(vec.split(), dtype=np.float32))
+        # Annoying implementation detail; '(' and ')' are replaced by '-LRB-' and
+        # '-RRB-' respectively in the parse-trees.
+        word2index[u'-LRB-'] = word2index.pop(u'(')
+        word2index[u'-RRB-'] = word2index.pop(u')')
+        # Random embedding vector for unknown words.
+        weight_vectors.append(np.random.uniform(
+            -0.05, 0.05, weight_vectors[0].shape).astype(np.float32))
+        return np.array(weight_vectors, dtype=np.float32), word2index
+
+
+def evaluate_dataset(model, trees, batch_size=25):
+    model.reset_metrics()
+    complicity = 0
+    for batch in tfe.Iterator(trees.shuffle(buffer_size=12000).batch(batch_size)):
+        model(batch)
+        complicity += batch_size
+        trees.print_progress_bar(complicity)
+    print('\n')
+    metrics = {name: metric.result().numpy() * 100 for name, metric in zip(["fine", "binary", "root_fine", "root_binary"],
+                                                                           [model.fine, model.binary, model.root_fine, model.root_binary])}
+    return ' '.join(['\%s: \%.2f' \% (name, metric) for name, metric in metrics.items()])
+
+
+def dev_eval(model, epoch, dev_trees, train_loss):
+    print('epoch:\%4d, train_loss: \%.3e, dev_loss_avg: \%.3e, dev_accuracy:\n  [\%s]'
+          \% (epoch, train_loss, model.loss, evaluate_dataset(model, dev_trees)))
+
+
+def train_epoch(model, train_trees, model_optimizer, embedding_optimizer, batch_size=25):
+    train_loss = 0
+    model.reset_metrics()
+    complicity = 0
+    for batch in tfe.Iterator(train_trees.shuffle(buffer_size=12000).batch(batch_size)):
+        with tfe.GradientTape() as tape:
+            tape.watch(model.variables)
+            model(batch)
+        gradient = tape.gradient(model.loss, model.variables)
+        embed_grads = gradient[:len(model.embed_variables)]
+        model_grads = gradient[len(model.embed_variables):]
+        train_loss += model.loss
+        model_optimizer.apply_gradients(zip(model_grads, model.model_variables), global_step=tf.train.get_global_step())
+        embedding_optimizer.apply_gradients(zip(embed_grads, model.embed_variables), global_step=tf.train.get_global_step())
+        complicity += batch_size
+        train_trees.print_progress_bar(complicity)
+    print('\n')
+    return train_loss
+
+
+def replace_words_by_index(tree, word2index):
+    tree[0] = int(tree[0])
+    tree[1][0] = word2index.get(tree[1][0], -1)
+    tree[1][1] = [replace_words_by_index(child, word2index) for child in tree[1][1]]
+    return tree
+
+
+def main():
+    epochs = 5
+    learning_rate = 0.05
+    embedding_learning_rate_factor = 0.1
+    checkpoint_directory = "./data/checkpoints"
+    checkpoint_prefix = os.path.join(checkpoint_directory, "cstlstm")
+
+    embed, embed_indexes = load_embeddings('./data/filtered_glove.txt')
+    train_trees = Treebank('./data', 'train', embed_indexes)
+    dev_trees = Treebank('./data', 'dev', embed_indexes)
+    test_trees = Treebank('./data', 'test', embed_indexes)
+
+    model = ChildSumTreeLSTMClassifier(embed)
+    model_optimizer = tf.train.AdagradOptimizer(learning_rate)
+    embedding_optimizer = tf.train.AdagradOptimizer(learning_rate * embedding_learning_rate_factor)
+    checkpoint = model.checkpoint()
+
+    if len(sys.argv) > 1 and sys.argv[1] == 'skip_train':
+        checkpoint.restore(tf.train.latest_checkpoint(checkpoint_directory))
+        print("Test results: {}".format(evaluate_dataset(model, test_trees)))
+        return 0
+
+    try:
+        for epoch in range(epochs):
+            start = time.time()
+            train_loss = train_epoch(model, train_trees, model_optimizer, embedding_optimizer)
+            print("time spent {}".format(time.time() - start))
+            checkpoint = model.checkpoint()
+            checkpoint.save(file_prefix=checkpoint_prefix)
+            dev_eval(model, epoch, dev_trees, train_loss)
+    except KeyboardInterrupt:
+        print("\nInterrupt training procces")
+    print("Test results: {}".format(evaluate_dataset(model, test_trees)))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+\end{lstlisting}
+
+\begin{center}Класс \texttt{models.SubCategory}\end{center}
+
+\begin{lstlisting}[style=app]
+
+from sqlalchemy.dialects.mysql import VARCHAR
+from src.models import sa, orm, Base, Category, CategoryRelation, DeclarativeBase
+
+class SubCategory(Base, DeclarativeBase):
+    """The model for SubCategory data"""
+    __tablename__ = "sub_category"
+
+    description = sa.Column(VARCHAR(100, charset='utf8'))
+    category = orm.relationship("Category", back_popuflates="sub_categories")
+
+\end{lstlisting}
+
+\begin{center}Класс \texttt{models.Category}\end{center}
+
+\begin{lstlisting}[style=app]
+
+from sqlalchemy.dialects.mysql import VARCHAR
+from src.models import sa, orm, Base, CategoryRelation, DeclarativeBase
+
+class Category(Base, DeclarativeBase):
+    """The model for Category data"""
+    __tablename__ = "category"
+
+    description = sa.Column(VARCHAR(100, charset='utf8'))
+
+\end{lstlisting}
+
+\begin{center}Класс \texttt{models.SubCategoryLink}\end{center}
+
+\begin{lstlisting}[style=app]
+
+from sqlalchemy.schema import ForeignKey
+from src.models import sa, orm, DeclarativeBase
+
+class CategoryRelation(DeclarativeBase):
+    """The model for SubCategoryLink data"""
+    __tablename__ = "category_relation"
+
+    id = sa.Column(sa.Integer, primary_key=True)
+    item_id = sa.Column(sa.Integer, ForeignKey("item.id"))
+    sub_category_id = sa.Column(sa.Integer, ForeignKey("sub_category.id"))
+    sub_category = orm.relationship("SubCategory", back_popuflates="items")
+    item = orm.relationship("Kernel", back_populates="sub_categories")
+
+\end{lstlisting}
+
+\begin{center}Класс \texttt{models.Item}\end{center}
+
+\begin{lstlisting}[style=app]
+
+from sqlalchemy.schema import ForeignKey
+from src.models import sa, orm, DeclarativeBase
+
+class Item(DeclarativeBase):
+    """The model for Item data"""
+    __tablename__ = "item"
+
+    id = sa.Column(sa.Integer, primary_key=True)
+    name = sa.Column(VARCHAR(100, charset='utf8'))
+    cost = sa.Column(sa.Integer, primary_key=True)
+    rating = sa.Column(sa.Integer, primary_key=True)
+    state = sa.Column(sa.Integer, primary_key=True)
+    number = sa.Column(sa.Integer, primary_key=True)
+    sold = sa.Column(sa.Integer, primary_key=True)
+    seller = orm.relationship("Seller", back_popuflates="items")
+    sstore = orm.relationship("Store", back_popuflates="items")
+
+\end{lstlisting}
+
+\begin{center}Класс \texttt{models.Store}\end{center}
+
+\begin{lstlisting}[style=app]
+
+from sqlalchemy.schema import ForeignKey
+from src.models import sa, orm, DeclarativeBase
+
+class Store(DeclarativeBase):
+    """The model for Store data"""
+    __tablename__ = "store"
+
+    id = sa.Column(sa.Integer, primary_key=True)
+    name = sa.Column(VARCHAR(100, charset='utf8'))
+
+\end{lstlisting}
+
+\begin{center}Модуль \texttt{downloader}\end{center}
+
+\begin{lstlisting}[style=app]
+#!/usr/bin/env python3
+
+import os
+import requests
+
+basedir, _ = os.path.split(__file__)
+
+# logging
+import logging, logging.config
+log_config_file = os.path.join(basedir, 'logging.conf')
+if os.path.exists(log_config_file):
+    # load config from config file, see logging.conf for configuration settings
+    logging.config.fileConfig(log_config_file)
+else:
+    # or just do a basic config
+    format = '\%(name)s - \%(levelname)s - \%(filename)s - \%(lineno)d - \%(message)s'
+    logging.basicConfig(format=format, level=logging.NOTSET)
+
+log = logging.getLogger(__package__)
+log.debug("logging is setup")
+
+import src.models as db
+log.debug("db import")
+
+
+class BaseApp():
+
+    def __init__(self):
+        log.debug('start init')
+
+        db_driver = 'mysql+oursql'
+        db_url = db.sa.engine.url.URL(db_driver,
+                                      host='localhost',
+                                      database='kaggle',
+                                      username='root')
+        db_url = str(db_url) + '?charset=utf8'
+        log.debug("db: \%s\n\n" \% (db_url))
+
+        log.debug("connect db")
+        engine = db.sa.create_engine(db_url, echo=False)
+        db.init_model(engine)
+        self.session = db.db_session()
+
+        log.debug("setup db")
+        db.metadata.create_all(engine)
+        log.debug("db created")
+
+        log.debug('end init')
+
+    def get_kernels(self):
+        TOKEN_LEN = 10
+        params = {
+            'sortBy': 'creation',
+            'group': 'everyone',
+            'pageSize': TOKEN_LEN,
+        }
+        self.get_missing(params)
+
+    def get_competitions(self):
+        competitions_url = 'https://www.kaggle.com/competitions.json'
+        PAGE_SIZE = 20
+        params = {'sortBy': 'recentlyCreated',
+                  'group': 'general',
+                  'page': 1,
+                  'pageSize': PAGE_SIZE}
+        response = requests.get(competitions_url, params)
+        total_number = response.json()['pagedCompetitionGroup']['totalCompetitions']
+        for page in range(1, (total_number // PAGE_SIZE) + 2):
+            params['page'] = page
+            response = requests.get(competitions_url, params)
+            competitions = response.json()['pagedCompetitionGroup']['competitions']
+            for competition in competitions:
+                self.save_competition_info(competition)
+
+    def save_competition_info(self, competition_json):
+        TOKEN_LEN = 10
+        competition = self.session.query(db.Competition).filter(db.Competition.id == competition_json['competitionId']).first()
+        if not competition:
+            competition = db.Competition(id=competition_json['competitionId'],
+                                         title=competition_json['competitionTitle'])
+            self.session.add(competition)
+            self.session.flush()
+            self.session.commit()
+
+        cats = self.get_categories(competition_json)
+        for cat in cats:
+            rel = db.CategoryRelation(category=cat,
+                                      competition=competition)
+            self.session.add(rel)
+        params = {
+            'sortBy': 'creation',
+            'group': 'everyone',
+            'pageSize': TOKEN_LEN,
+            'competitionId': competition.id
+        }
+        self.get_missing(params)
+
+    def get_missing(self, params):
+        kernel_list_url = 'https://www.kaggle.com/kernels.json'
+        while True:
+            try:
+                response = requests.get(kernel_list_url, params)
+            except Exception as error:
+                log_file = open('log.txt', "a")
+                log_file.write("Crushed on GET {} with {} with {}".format(kernel_list_url,
+                                                                          params,
+                                                                          error))
+                log_file.write('Exception: {}\n'.format(type(error)))
+                log_file.close()
+                continue
+            if not response.json():
+                return
+            params['after'] = response.json()[-1]['id']
+            for kernel in response.json():
+                db_kernel = self.session.query(db.Kernel).filter(db.Kernel.id == kernel['id']).first()
+                competition_id = None
+                if db_kernel and db_kernel.source_version != kernel['scriptVersionId']:
+                    competition_id = db_kernel.competition_id
+                    self.session.delete(db_kernel)
+                    db_kernel = None
+                if not db_kernel:
+                    newbie = self.save_kernel_info(kernel)
+                    if competition_id is not None:
+                        newbie.competition_id = competition_id
+                    elif 'competitionId' in params:
+                        newbie.competition_id = params['competitionId']
+            self.session.flush()
+            self.session.commit()
+
+    def save_kernel_info(self, kernel_json):
+        log_msg = 'Try to process kernel id: {} lang: {} notebook: {} scr_id: {}'
+        log_msg = log_msg.format(kernel_json['id'],
+                                 kernel_json['aceLanguageName'],
+                                 kernel_json['isNotebook'],
+                                 kernel_json['scriptVersionId'])
+        log.debug(log_msg)
+        author_id = kernel_json['author']['userId']
+        author = self.session.query(db.User).filter(db.User.id == author_id).first()
+        if not author:
+            author = db.User(id=author_id,
+                             title=kernel_json['author']['displayName'],
+                             user_name=kernel_json['author']['userName'],
+                             tier=kernel_json['author']['tier'])
+        new_kernel = db.Kernel(id=kernel_json['id'],
+                               title=kernel_json['title'],
+                               lang=kernel_json['aceLanguageName'],
+                               notebook=kernel_json['isNotebook'],
+                               votes=kernel_json['totalVotes'],
+                               best_score=kernel_json['bestPublicScore'],
+                               source_version=kernel_json['scriptVersionId'],
+                               author=author)
+        download_url = 'https://www.kaggle.com/kernels/sourceurl/{}'
+        download_url = download_url.format(new_kernel.source_version)
+        try:
+            response = requests.get(download_url)
+            download_url = response.content.decode('utf-8')
+            techs = self.get_technology(download_url,
+                                        new_kernel.lang,
+                                        new_kernel.notebook)
+            for tech in techs:
+                rel = db.TechnologyRelation(technology=tech,
+                                            kernel=new_kernel)
+                self.session.add(rel)
+        except Exception as error:
+            log_file = open('log.txt', "a")
+            log_file.write(log_msg + ' ')
+            log_file.write("Crushed on GET {} with {}\n".format(download_url, error))
+            log_file.write('Exception: {}\n'.format(type(error)))
+            log_file.close()
+        cats = self.get_categories(kernel_json)
+        for cat in cats:
+            rel = db.CategoryRelation(category=cat,
+                                      kernel=new_kernel)
+            self.session.add(rel)
+        data_links = self.get_data_link(kernel_json)
+        for link in data_links:
+            rel = db.DataLinkRelation(data_link=link,
+                                      kernel=new_kernel)
+            self.session.add(rel)
+        self.session.add(new_kernel)
+        return new_kernel
+
+    def get_categories(self, kaggle_object):
+        cat_dict = {cat['name']: cat for cat in kaggle_object['categories']['categories']}
+        if not cat_dict:
+            return []
+        old = self.session.query(db.Category).filter(db.Category.title.in_(cat_dict.keys())).all()
+        old_names = {cat.title for cat in old}
+        new_names = set(cat_dict.keys()) - old_names
+        new_categories = []
+        for name in new_names:
+            cat = cat_dict[name]
+            new_categories.append(db.Category(title=cat['name'],
+                                              description=cat['description']))
+        self.session.add_all(new_categories)
+        return new_categories + old
+
+    def get_technology(self, src_url, lang, notebook):
+        script = os.path.join(basedir, 'get_tech.sh')
+        script += ' \"{}\" \"{}\" \"{}\"'.format(src_url, lang, notebook)
+        names = os.popen(script).read().split()
+        if not names:
+            return names
+        old = self.session.query(db.Technology).filter(db.Technology.title.in_(names)).all()
+        old_names = [tech.title for tech in old]
+        new_names = set(names) - set(old_names)
+        new_tech = [db.Technology(title=title) for title in new_names]
+        self.session.add_all(new_tech)
+        return old + new_tech
+
+    def get_data_link(self, kernel):
+        src_dict = {src['name']: src for src in kernel['dataSources']}
+        if not src_dict:
+            return []
+        old = self.session.query(db.DataLink).filter(db.DataLink.title.in_(src_dict.keys())).all()
+        old_names = {src.title for src in old}
+        new_names = set(src_dict.keys()) - old_names
+        new_data_links = []
+        for name in new_names:
+            src = src_dict[name]
+            new_data_links.append(db.DataLink(title=src['name'],
+                                              link=src['url']))
+        self.session.add_all(new_data_links)
+        return new_data_links + old
+
+    def run(self):
+        # self.get_kernels()
+        self.get_competitions()
+
+\end{lstlisting}
+
+\begin{center}Класс \texttt{models.Achievement}\end{center}
+
+\begin{lstlisting}[style=app]
+
+from sqlalchemy.schema import ForeignKey
+from src.models import sa, orm, DeclarativeBase
+
+class Achievement(DeclarativeBase):
+    """The model for Achievement data"""
+    __tablename__ = "achievement"
+
+    id = sa.Column(sa.Integer, primary_key=True)
+    name = sa.Column(VARCHAR(100, charset='utf8'))
+
+\end{lstlisting}
+
+\begin{center}Класс \texttt{models.AchievementLink}\end{center}
+
+\begin{lstlisting}[style=app]
+
+from sqlalchemy.schema import ForeignKey
+from src.models import sa, orm, DeclarativeBase
+
+class AchievementLink(DeclarativeBase):
+    """The model for AchievementLink data"""
+    __tablename__ = "achievement_link"
+
+    id = sa.Column(sa.Integer, primary_key=True)
+    achievement = orm.relationship("Achievement", back_popuflates="item_link")
+    item = orm.relationship("Kernel", back_populates="achievement_link")
+
+  \end{lstlisting}
+
+
+\begin{center}Класс \texttt{models.Genre}\end{center}
+
+\begin{lstlisting}[style=app]
+
+from sqlalchemy.schema import ForeignKey
+from src.models import sa, orm, DeclarativeBase
+
+class Genre(DeclarativeBase):
+    """The model for Genre data"""
+    __tablename__ = "genre"
+
+    id = sa.Column(sa.Integer, primary_key=True)
+    name = sa.Column(VARCHAR(100, charset='utf8'))
+
+\end{lstlisting}
+
+\begin{center}Класс \texttt{models.GenreLink}\end{center}
+
+\begin{lstlisting}[style=app]
+
+from sqlalchemy.schema import ForeignKey
+from src.models import sa, orm, DeclarativeBase
+
+class GenreLink(DeclarativeBase):
+    """The model for GenreLink data"""
+    __tablename__ = "genre_link"
+
+    id = sa.Column(sa.Integer, primary_key=True)
+    genre = orm.relationship("Genre", back_popuflates="film_link")
+    film = orm.relationship("Film", back_populates="genre_link")
+
+  \end{lstlisting}
