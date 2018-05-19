@@ -1,8 +1,8 @@
 \appendix
 
-\appendixtitle{обязательное}{Листинг кода}
+\appendixtitle{обязательное}{Листинг кода модуля \texttt{cstlstm}}
 
-\begin{center}Модуль \texttt{cstlstm}\end{center}
+\begin{center}Класс \texttt{ChildSumTreeLSTMCell}\end{center}
 
 \begin{lstlisting}[style=app]
 import json
@@ -36,8 +36,11 @@ class ChildSumTreeLSTMCell(tf.keras.Model):
         c = (i * u) + tf.reduce_sum(f * child_c, 0)
         h = o * tf.tanh(c)
         return c, h
+\end{lstlisting}
 
+\begin{center}Класс \texttt{ChildSumTreeLSTMClassifier}\end{center}
 
+\begin{lstlisting}[style=app]
 class ChildSumTreeLSTMClassifier(tf.keras.Model):
 
     def __init__(self, embed, unit_numb=150, class_numb=5, reg_factor=0.0001, keep_prob=0.5):
@@ -138,7 +141,10 @@ class ChildSumTreeLSTMClassifier(tf.keras.Model):
 
 \end{lstlisting}
 
-\begin{center}Модуль \texttt{inference}\end{center}
+\appendixtitle{обязательное}{Листинг кода модуля \texttt{inference}}
+
+\begin{center}Класс \texttt{Inference}\end{center}
+
 \begin{lstlisting}[style=app]
 #!/usr/bin/env python3
 import sys
@@ -231,7 +237,9 @@ if __name__ == "__main__":
     sys.exit(main())
 \end{lstlisting}
 
-\begin{center}Модуль \texttt{labeled\_tree}\end{center}
+\appendixtitle{обязательное}{Листинг кода модуля \texttt{labeled\_tree}}
+
+\begin{center}Класс \texttt{LabeledTree}\end{center}
 
 \begin{lstlisting}[style=app]
 """
@@ -437,7 +445,9 @@ class LabeledTree(object):
         insert_sentiment_markup(tree_width=tree_width, tree_height=tree_height, tree_node_radius=tree_node_radius)
 \end{lstlisting}
 
-\begin{center}Модуль \texttt{train}\end{center}
+\appendixtitle{обязательное}{Листинг кода модуля \texttt{train}}
+
+\begin{center}Класс \texttt{Treebank}\end{center}
 
 \begin{lstlisting}[style=app]
 #!/usr/bin/env python3
@@ -491,6 +501,11 @@ class Treebank(tf.data.TextLineDataset):
         if iteration >= self.size:
             print()
 
+\end{lstlisting}
+
+\begin{center}Класс \texttt{Train}\end{center}
+
+\begin{lstlisting}[style=app]
 
 def load_embeddings(embedding_path):
     """Loads embedings, returns weight matrix and dict from words to indices."""
@@ -597,6 +612,8 @@ if __name__ == "__main__":
     sys.exit(main())
 \end{lstlisting}
 
+\appendixtitle{обязательное}{Листинг кода модуля \texttt{model}}
+
 \begin{center}Класс \texttt{models.SubCategory}\end{center}
 
 \begin{lstlisting}[style=app]
@@ -686,7 +703,9 @@ class Store(DeclarativeBase):
 
 \end{lstlisting}
 
-\begin{center}Модуль \texttt{downloader}\end{center}
+\appendixtitle{обязательное}{Листинг кода модуля \texttt{downloader}}
+
+\begin{center}Класс \texttt{Downloader}\end{center}
 
 \begin{lstlisting}[style=app]
 #!/usr/bin/env python3
