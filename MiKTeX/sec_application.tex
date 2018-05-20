@@ -1,6 +1,6 @@
 \appendix
 
-\appendixtitle{обязательное}{Листинг кода модуля \texttt{cstlstm}}
+\appendixtitle{обязательное}{Листинг кода предсказателя}
 
 \begin{center}Класс \texttt{ChildSumTreeLSTMCell}\end{center}
 
@@ -141,8 +141,6 @@ class ChildSumTreeLSTMClassifier(tf.keras.Model):
 
 \end{lstlisting}
 
-\appendixtitle{обязательное}{Листинг кода модуля \texttt{inference}}
-
 \begin{center}Класс \texttt{Inference}\end{center}
 
 \begin{lstlisting}[style=app]
@@ -236,8 +234,6 @@ def main():
 if __name__ == "__main__":
     sys.exit(main())
 \end{lstlisting}
-
-\appendixtitle{обязательное}{Листинг кода модуля \texttt{labeled\_tree}}
 
 \begin{center}Класс \texttt{LabeledTree}\end{center}
 
@@ -445,19 +441,15 @@ class LabeledTree(object):
         insert_sentiment_markup(tree_width=tree_width, tree_height=tree_height, tree_node_radius=tree_node_radius)
 \end{lstlisting}
 
-\appendixtitle{обязательное}{Листинг кода модуля \texttt{train}}
-
 \begin{center}Класс \texttt{Treebank}\end{center}
 
 \begin{lstlisting}[style=app]
 #!/usr/bin/env python3
-
 import json
 import os
 import sys
 import time
 import codecs
-
 import numpy as np
 import tensorflow as tf
 import tensorflow.contrib.eager as tfe
@@ -465,7 +457,6 @@ import tensorflow.contrib.eager as tfe
 from cstlstm import ChildSumTreeLSTMClassifier
 
 tf.enable_eager_execution()
-
 
 class Treebank(tf.data.TextLineDataset):
 
@@ -612,7 +603,7 @@ if __name__ == "__main__":
     sys.exit(main())
 \end{lstlisting}
 
-\appendixtitle{обязательное}{Листинг кода модуля \texttt{model}}
+\appendixtitle{обязательное}{Листинг кода сбора статистики}
 
 \begin{center}Класс \texttt{models.SubCategory}\end{center}
 
@@ -702,8 +693,6 @@ class Store(DeclarativeBase):
     name = sa.Column(VARCHAR(100, charset='utf8'))
 
 \end{lstlisting}
-
-\appendixtitle{обязательное}{Листинг кода модуля \texttt{downloader}}
 
 \begin{center}Класс \texttt{Downloader}\end{center}
 
